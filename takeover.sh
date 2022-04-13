@@ -1,9 +1,25 @@
-#!/bin/sh
+#!/bin/bash
 set -e
 
 TO=/takeover
 OLD_INIT=$(readlink /proc/1/exe)
 PORT=80
+
+echo "Preparing tmpfs..."
+
+mkdir $TO
+mount -t tmpfs none $TO
+mkdir $TO/{proc,sys,dev,run,usr,var,tmp,oldroot}
+cp -ax /{bin,etc,mnt,sbin,lib,lib64} $TO/
+cp -ax /usr/{bin,sbin,lib,lib64,share} $TO/usr/
+cp -ax /var/{backups,cache,lib,local,lock,log,mail,opt,run,spool,tmp} $TO/var/
+cp -ax /run/* $TO/run/
+
+apt install build-essential wget
+wget -O $TO/busybox https://www.busybox.net/downloads/binaries/1.35.0-x86_64-linux-musl/busybox 
+chmod +x $TO/busybox
+gcc fakeinit.c -o fakeinit 
+cp fakeinit $TO/
 
 cd "$TO"
 
@@ -86,3 +102,6 @@ telinit u
 
 ./busybox sleep 10
 
+./busybox echo "Killing all old processes!"
+
+nohup ./busybox kill -9 $(lsof +D /old_root/ | awk '{if (NR>1) {print $2}}' | uniq) &
